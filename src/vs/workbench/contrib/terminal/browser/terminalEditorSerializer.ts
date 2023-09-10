@@ -4,10 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { IInstantiationService } from 'vs/platform/instantiation/common/instantiation';
-import { TerminalIcon, TitleEventSource } from 'vs/platform/terminal/common/terminal';
 import { IEditorSerializer } from 'vs/workbench/common/editor';
 import { EditorInput } from 'vs/workbench/common/editor/editorInput';
-import { ITerminalEditorService, ITerminalInstance } from 'vs/workbench/contrib/terminal/browser/terminal';
+import { ISerializedTerminalEditorInput, ITerminalEditorService, ITerminalInstance } from 'vs/workbench/contrib/terminal/browser/terminal';
 import { TerminalEditorInput } from 'vs/workbench/contrib/terminal/browser/terminalEditorInput';
 
 export class TerminalInputSerializer implements IEditorSerializer {
@@ -20,7 +19,7 @@ export class TerminalInputSerializer implements IEditorSerializer {
 	}
 
 	public serialize(editorInput: TerminalEditorInput): string | undefined {
-		if (!editorInput.terminalInstance?.persistentProcessId) {
+		if (!editorInput.terminalInstance?.persistentProcessId || !editorInput.terminalInstance.shouldPersist) {
 			return;
 		}
 		const term = JSON.stringify(this._toJson(editorInput.terminalInstance));
@@ -29,11 +28,10 @@ export class TerminalInputSerializer implements IEditorSerializer {
 
 	public deserialize(instantiationService: IInstantiationService, serializedEditorInput: string): EditorInput | undefined {
 		const terminalInstance = JSON.parse(serializedEditorInput);
-		const editor = this._terminalEditorService.getOrCreateEditorInput(terminalInstance);
-		return editor;
+		return this._terminalEditorService.reviveInput(terminalInstance);
 	}
 
-	private _toJson(instance: ITerminalInstance): SerializedTerminalEditorInput {
+	private _toJson(instance: ITerminalInstance): ISerializedTerminalEditorInput {
 		return {
 			id: instance.persistentProcessId!,
 			pid: instance.processId || 0,
@@ -41,17 +39,12 @@ export class TerminalInputSerializer implements IEditorSerializer {
 			titleSource: instance.titleSource,
 			cwd: '',
 			icon: instance.icon,
-			color: instance.color
+			color: instance.color,
+			hasChildProcesses: instance.hasChildProcesses,
+			isFeatureTerminal: instance.shellLaunchConfig.isFeatureTerminal,
+			hideFromUser: instance.shellLaunchConfig.hideFromUser,
+			reconnectionProperties: instance.shellLaunchConfig.reconnectionProperties,
+			shellIntegrationNonce: instance.shellIntegrationNonce
 		};
 	}
-}
-
-export interface SerializedTerminalEditorInput {
-	readonly id: number;
-	readonly pid: number;
-	readonly title: string;
-	readonly titleSource: TitleEventSource;
-	readonly cwd: string;
-	readonly icon: TerminalIcon | undefined;
-	readonly color: string | undefined;
 }
